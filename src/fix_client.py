@@ -5,9 +5,9 @@ import quickfix44 as fix44
 from .fix_application import FIXApplication
 import configparser
 
-
 class FIXClient:
     def __init__(self, config_file_path: str, fix_application: FIXApplication):
+        # Initialize settings, application, store factory, log factory, and initiator
         self.settings = fix.SessionSettings(config_file_path)
         self.application = fix_application
         self.storeFactory = fix.FileStoreFactory(self.settings)
@@ -16,19 +16,29 @@ class FIXClient:
         self.session_id = self._get_session_id_from_config(config_file_path)
 
     def _get_session_id_from_config(self, config_file_path: str) -> fix.SessionID:
+        """
+        Extract the SessionID from the configuration file.
+        """
         config = configparser.ConfigParser()
         config.read(config_file_path)
+        session_cfg = config['SESSION']
         return fix.SessionID(
-            config['SESSION']['BeginString'],
-            config['SESSION']['SenderCompID'],
-            config['SESSION']['TargetCompID'],
+            session_cfg['BeginString'],
+            session_cfg['SenderCompID'],
+            session_cfg['TargetCompID']
         )
 
     def _get_session_info(self, field_name: str) -> str:
+        """
+        Get session information based on the provided field name.
+        """
         session_settings = self.settings.get(self.session_id)
         return session_settings.getString(field_name) if session_settings.has(field_name) else 'SESSION'
 
     def _create_header(self, msg: fix.Message, msg_type: str) -> None:
+        """
+        Create and set the header for the FIX message.
+        """
         header = msg.getHeader()
         header.setField(fix.BeginString(fix.BeginString_FIX44))
         header.setField(fix.MsgType(msg_type))
@@ -43,20 +53,32 @@ class FIXClient:
         header.setField(fix.StringField(60, transact_time))
 
     def logon(self) -> None:
+        """
+        Start the connection and wait until logon is successful.
+        """
         self.initiator.start()
         while not self.initiator.isLoggedOn():
             time.sleep(1)
 
     def logout(self) -> None:
+        """
+        Stop the connection.
+        """
         self.initiator.stop()
 
     def _send_message(self, msg: fix.Message) -> None:
+        """
+        Send the FIX message to the target.
+        """
         sender_comp_id = self._get_session_info('SenderCompID')
         target_comp_id = self._get_session_info('TargetCompID')
         
         fix.Session.sendToTarget(msg, sender_comp_id, target_comp_id)
 
     def _add_party_ids(self, msg: fix.Message) -> None:
+        """
+        Add party IDs to the FIX message.
+        """
         party_ids = [
             ('SUP', 'D', 36),
             ('93', 'D', 7),
@@ -71,15 +93,14 @@ class FIXClient:
 
     def send_resend_request(self, begin_seq_no: int, end_seq_no: int) -> None:
         """
-        Envia uma mensagem ResendRequest para solicitar o reenvio de mensagens.
+        Send a ResendRequest message to request the resending of messages.
 
-        :param begin_seq_no: Número de sequência inicial para o reenvio.
-        :param end_seq_no: Número de sequência final para o reenvio. Use 0 para solicitar todas as mensagens subsequentes.
+        :param begin_seq_no: Begin sequence number for the resend.
+        :param end_seq_no: End sequence number for the resend. Use 0 to request all subsequent messages.
         """
         resend_request = fix44.ResendRequest()
         resend_request.setField(fix.BeginSeqNo(begin_seq_no))
         resend_request.setField(fix.EndSeqNo(end_seq_no))
 
         self._send_message(resend_request)
-        print(f"ResendRequest enviado de {begin_seq_no} até {end_seq_no}")
-
+        print(f"ResendRequest sent from {begin_seq_no} to {end_seq_no}")

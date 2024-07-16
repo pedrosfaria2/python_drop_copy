@@ -7,7 +7,10 @@ from datetime import datetime
 
 running = True
 
-def setup_logger():
+def setup_logger() -> None:
+    """
+    Configure the logger to record log consolidation activities.
+    """
     log_date = datetime.now().strftime("%Y-%m-%d")
     log_filename = f"human_readable_logs/{log_date}_consolidation.log"
     os.makedirs(os.path.dirname(log_filename), exist_ok=True)
@@ -16,16 +19,28 @@ def setup_logger():
                         level=logging.DEBUG,
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-def get_log_directory_from_cfg(cfg_file):
+def get_log_directory_from_cfg(cfg_file: str) -> str:
+    """
+    Get the log directory from the configuration file.
+
+    Args:
+        cfg_file (str): Path to the .cfg configuration file.
+
+    Returns:
+        str: Log directory specified in the configuration file.
+    """
     config = configparser.ConfigParser()
     config.read(cfg_file)
     return config['DEFAULT'].get('FileLogPath', 'log')
 
-def consolidate_logs():
+def consolidate_logs() -> None:
+    """
+    Consolidate log files into a single consolidated log file.
+    """
     if not running:
         return
 
-    # Obter o caminho do diretório de logs do arquivo .cfg
+    # Get the log directory path from the .cfg file
     cfg_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.cfg')
     log_directory = get_log_directory_from_cfg(cfg_file)
 
@@ -36,6 +51,7 @@ def consolidate_logs():
 
     consolidated_log_file = os.path.join(log_directory, "consolidated_log.log")
 
+    # Find all log files ending with 'messages.current.log'
     log_files = glob.glob(os.path.join(log_directory, '*messages.current.log'))
 
     logging.info(f"Found {len(log_files)} log files to consolidate.")
@@ -44,7 +60,16 @@ def consolidate_logs():
         logging.warning("No log files found to consolidate.")
         return
 
-    def line_filter(line):
+    def line_filter(line: str) -> bool:
+        """
+        Filter out unwanted log lines.
+
+        Args:
+            line (str): Log line.
+
+        Returns:
+            bool: True if the line should be included, False otherwise.
+        """
         return 'CNOV0012' not in line and '35=0' not in line
 
     with open(consolidated_log_file, 'w') as consolidated_file:
