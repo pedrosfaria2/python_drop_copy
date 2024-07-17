@@ -12,28 +12,6 @@ from src.fix_client import FIXClient
 console = Console()
 running = True
 
-def start_concat_logs() -> subprocess.Popen:
-    """
-    Starts the log concatenation process by running concat_logs.py in a new subprocess.
-    
-    Returns:
-        subprocess.Popen: The process running the log concatenation script.
-    """
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    concat_logs_path = os.path.join(current_dir, 'concat_logs.py')
-    return subprocess.Popen(['python', concat_logs_path])
-
-def stop_concat_logs(process: Optional[subprocess.Popen]) -> None:
-    """
-    Stops the log concatenation process if it is running.
-    
-    Args:
-        process (Optional[subprocess.Popen]): The process to terminate.
-    """
-    if process:
-        process.terminate()
-        process.wait()
-
 def main_menu(*clients: List['FIXClient']) -> None:
     """
     Displays the main menu and handles user interactions.
@@ -41,11 +19,10 @@ def main_menu(*clients: List['FIXClient']) -> None:
     Args:
         clients (List[FIXClient]): List of FIXClient instances.
     """
-    concat_logs_process: Optional[subprocess.Popen] = None
     menu_options: dict[str, Tuple[str, Callable[[], None]]] = {
-        "1": ("Logon", lambda: logon_clients(clients, concat_logs_process)),
+        "1": ("Logon", lambda: logon_clients(clients)),
         "2": ("Send ResendRequest", lambda: send_resend_request_to_clients(clients)),
-        "3": ("Logout and exit", lambda: logout_clients(clients, concat_logs_process))
+        "3": ("Logout and exit", lambda: logout_clients(clients))
     }
 
     while running:
@@ -74,19 +51,16 @@ def display_menu(menu_options: dict[str, Tuple[str, Callable[[], None]]]) -> Non
 
     console.print(table)
 
-def logon_clients(clients: List['FIXClient'], concat_logs_process: Optional[subprocess.Popen]) -> None:
+def logon_clients(clients: List['FIXClient']) -> None:
     """
-    Logs on all clients and starts the log concatenation process.
+    Logs on all clients.
     
     Args:
         clients (List[FIXClient]): List of FIXClient instances.
-        concat_logs_process (Optional[subprocess.Popen]): The log concatenation process.
     """
     console.clear()
     for client in clients:
         client.logon()
-    if not concat_logs_process:
-        concat_logs_process = start_concat_logs()
     console.print(Panel("[green]All clients logged on successfully.[/green]", title="Success", border_style="green"))
     console.input("Press ENTER to continue...")
 
@@ -105,18 +79,16 @@ def send_resend_request_to_clients(clients: List['FIXClient']) -> None:
     console.print(Panel("[green]ResendRequest sent to all clients.[/green]", title="Success", border_style="green"))
     console.input("Press ENTER to continue...")
 
-def logout_clients(clients: List['FIXClient'], concat_logs_process: Optional[subprocess.Popen]) -> None:
+def logout_clients(clients: List['FIXClient']) -> None:
     """
-    Logs out all clients and stops the log concatenation process.
+    Logs out all clients.
     
     Args:
         clients (List[FIXClient]): List of FIXClient instances.
-        concat_logs_process (Optional[subprocess.Popen]): The log concatenation process.
     """
     console.clear()
     for client in clients:
         client.logout()
-    stop_concat_logs(concat_logs_process)
     console.print(Panel("[green]All clients logged out successfully.[/green]", title="Success", border_style="green"))
     global running
     running = False

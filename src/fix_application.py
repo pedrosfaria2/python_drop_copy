@@ -15,15 +15,27 @@ class FIXApplication(fix.Application):
         Sets up the logger for the FIX application.
         """
         log_date = datetime.now().strftime("%Y-%m-%d")
-        log_filename = f"human_readable_logs/{log_date}_fix.log"
-        os.makedirs(os.path.dirname(log_filename), exist_ok=True)
+        session_log_filename = f"human_readable_logs/{log_date}_fix.log"
+        communal_log_filename = "human_readable_logs/communal_fix.log"
+        os.makedirs(os.path.dirname(session_log_filename), exist_ok=True)
 
-        handler = logging.FileHandler(log_filename)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
+        session_handler = logging.FileHandler(session_log_filename)
+        communal_handler = logging.FileHandler(communal_log_filename, mode='a')
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # Corrigido para 'levelname'
+        session_handler.setFormatter(formatter)
+        communal_handler.setFormatter(formatter)
 
         self.logger.setLevel(logging.DEBUG)
-        self.logger.addHandler(handler)
+        self.logger.addHandler(session_handler)
+        self.logger.addHandler(communal_handler)
+
+        # Setup message logs
+        message_log_filename = f"human_readable_logs/{log_date}_messages.current.log"
+        communal_message_log_filename = "human_readable_logs/communal_messages.current.log"
+        os.makedirs(os.path.dirname(message_log_filename), exist_ok=True)
+
+        self.session_message_log = open(message_log_filename, 'a')
+        self.communal_message_log = open(communal_message_log_filename, 'a')
 
     def format_fix_message(self, message: fix.Message) -> str:
         """
@@ -50,7 +62,7 @@ class FIXApplication(fix.Application):
         Callback for when a logon is successful.
         """
         self.sessionID = sessionID
-        self.logger.info(f'Successful logon to session {sessionID}')    
+        self.logger.info(f'Successful logon to session {sessionID}')
 
     def onLogout(self, sessionID: fix.SessionID) -> None:
         """
@@ -68,18 +80,21 @@ class FIXApplication(fix.Application):
             message.setField(fix.RawData(self.raw_data))
             message.setField(fix.RawDataLength(len(self.raw_data)))
         self.logger.debug(f'toAdmin: {self.format_fix_message(message)}')
+        self.log_message_raw(message)
 
     def fromAdmin(self, message: fix.Message, sessionID: fix.SessionID) -> None:
         """
         Callback for receiving administrative messages.
         """
         self.logger.debug(f'fromAdmin: {self.format_fix_message(message)}')
+        self.log_message_raw(message)
 
     def toApp(self, message: fix.Message, sessionID: fix.SessionID) -> None:
         """
         Callback for sending application-level messages.
         """
         self.logger.debug(f'toApp: {self.format_fix_message(message)}')
+        self.log_message_raw(message)
 
     def fromApp(self, message: fix.Message, sessionID: fix.SessionID) -> None:
         """
@@ -92,6 +107,7 @@ class FIXApplication(fix.Application):
             self.process_execution_report(message)
         else:
             self.logger.info(f'Received message: {self.format_fix_message(message)}')
+        self.log_message_raw(message)
 
     def process_execution_report(self, message: fix.Message) -> None:
         """
@@ -128,13 +144,28 @@ class FIXApplication(fix.Application):
         self.logger.info(log_message)
         self.log_to_file(log_message)
 
+    def log_message_raw(self, message: fix.Message) -> None:
+        """
+        Logs the raw FIX message to the session and communal log files.
+        
+        Args:
+            message (fix.Message): The FIX message to log.
+        """
+        raw_message = message.toString() + '\n'
+        self.session_message_log.write(raw_message)
+        self.session_message_log.flush()
+        self.communal_message_log.write(raw_message)
+        self.communal_message_log.flush()
+
     def log_to_file(self, message: str) -> None:
         """
         Logs the message to a file.
         """
         log_date = datetime.now().strftime("%Y-%m-%d")
-        log_filename = f"human_readable_logs/{log_date}_execution_reports.log"
-        os.makedirs(os.path.dirname(log_filename), exist_ok=True)
-        with open(log_filename, 'a') as f:
+        session_log_filename = f"human_readable_logs/{log_date}_execution_reports.log"
+        communal_log_filename = "human_readable_logs/communal_execution_reports.log"
+        os.makedirs(os.path.dirname(session_log_filename), exist_ok=True)
+        with open(session_log_filename, 'a') as f:
             f.write(message + '\n')
-
+        with open(communal_log_filename, 'a') as communal_file:
+            communal_file.write(message + '\n')
