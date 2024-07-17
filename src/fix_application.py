@@ -10,6 +10,18 @@ class FIXApplication(fix.Application):
         self.logger = logging.getLogger('FIXApplication')
         self._setup_logger()
 
+    import quickfix as fix
+import os
+import logging
+from datetime import datetime
+
+class FIXApplication(fix.Application):
+    def __init__(self, raw_data: str):
+        super().__init__()
+        self.raw_data = raw_data
+        self.logger = logging.getLogger('FIXApplication')
+        self._setup_logger()
+
     def _setup_logger(self) -> None:
         """
         Sets up the logger for the FIX application.
@@ -29,6 +41,9 @@ class FIXApplication(fix.Application):
             self.logger.setLevel(logging.DEBUG)
             self.logger.addHandler(session_handler)
             self.logger.addHandler(communal_handler)
+
+            # Ensure no logs are sent to the console
+            self.logger.propagate = False
 
             # Setup message logs
             message_log_filename = f"human_readable_logs/{log_date}_messages.current.log"

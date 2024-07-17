@@ -6,15 +6,11 @@ from rich.prompt import Prompt
 from rich.table import Table
 from rich.panel import Panel
 from typing import List, Callable, Optional, Tuple
-import logging
 
 from src.fix_client import FIXClient
 
 console = Console()
 running = True
-
-# Configure logger
-logging.basicConfig(filename='application.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def main_menu(*clients: List['FIXClient']) -> None:
     """
@@ -38,8 +34,7 @@ def main_menu(*clients: List['FIXClient']) -> None:
             if choice == "3":
                 break
         except Exception as e:
-            logging.error(f"An error occurred in the main menu: {e}")
-            console.print(Panel(f"[red]An error occurred: {e}[/red]", title="Error", border_style="red"))
+            console.print(Panel(f"[red]An error occurred in the main menu: {e}[/red]", title="Error", border_style="red"))
             console.input("Press ENTER to continue...")
 
 def display_menu(menu_options: dict[str, Tuple[str, Callable[[], None]]]) -> None:
@@ -73,7 +68,6 @@ def logon_clients(clients: List['FIXClient']) -> None:
             client.logon()
         console.print(Panel("[green]All clients logged on successfully.[/green]", title="Success", border_style="green"))
     except Exception as e:
-        logging.error(f"An error occurred during logon: {e}")
         console.print(Panel(f"[red]An error occurred during logon: {e}[/red]", title="Error", border_style="red"))
     finally:
         console.input("Press ENTER to continue...")
@@ -93,7 +87,6 @@ def send_resend_request_to_clients(clients: List['FIXClient']) -> None:
             client.send_resend_request(begin_seq_no, end_seq_no)
         console.print(Panel("[green]ResendRequest sent to all clients.[/green]", title="Success", border_style="green"))
     except Exception as e:
-        logging.error(f"An error occurred while sending ResendRequest: {e}")
         console.print(Panel(f"[red]An error occurred while sending ResendRequest: {e}[/red]", title="Error", border_style="red"))
     finally:
         console.input("Press ENTER to continue...")
@@ -111,7 +104,6 @@ def logout_clients(clients: List['FIXClient']) -> None:
             client.logout()
         console.print(Panel("[green]All clients logged out successfully.[/green]", title="Success", border_style="green"))
     except Exception as e:
-        logging.error(f"An error occurred during logout: {e}")
         console.print(Panel(f"[red]An error occurred during logout: {e}[/red]", title="Error", border_style="red"))
     finally:
         global running
