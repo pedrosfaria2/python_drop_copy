@@ -1,12 +1,13 @@
 
 # FIX Client Drop Copy
 
-This project is a FIX (Financial Information Exchange) client application designed for drop copy functionalities. It utilizes the QuickFIX library for handling FIX messages and provides a user-friendly interface for interacting with the client, sending ResendRequests, and managing log files.
+This project is a FIX (Financial Information Exchange) client application designed for drop copy functionalities. It utilizes the QuickFIX library for handling FIX messages and provides a user-friendly interface for interacting with the client, sending ResendRequests, managing log files, and handling secondary hosts for disaster recovery.
 
 ## Features
 
 - Logon and logout clients.
 - Send ResendRequest messages to clients.
+- Handle secondary hosts for disaster recovery.
 - Consolidate log files.
 - User-friendly command-line interface using the Rich library.
 
@@ -21,8 +22,8 @@ This project is a FIX (Financial Information Exchange) client application design
 1. Clone the repository:
 
     ```sh
-    git clone https://github.com/yourusername/fix-client-drop-copy.git
-    cd fix-client-drop-copy
+    git clone https://github.com/pedrosfaria2/python_drop_copy.git
+    cd python_drop_copy
     ```
 
 2. Configure your FIX sessions in `config.yaml` and `config.cfg`.
@@ -64,7 +65,8 @@ SenderCompID=FGHYJ6789
 RawData=password
 HeartBtInt=30
 SocketConnectPort=port
-SocketConnectHost=ipAddress
+SocketConnectHostPrimary=primary_ipAddress
+SocketConnectHostSecondary=secondary_ipAddress
 EncryptMethod=0
 RawDataLength=len(RawData)
 ResetSeqNumFlag=Y
@@ -83,7 +85,7 @@ ResetSeqNumFlag=Y
 ## Project Structure
 
 ```plaintext
-fix-client-drop-copy/
+python_drop_copy
 ├── src/
 │   ├── fix_application.py
 │   ├── fix_client.py
@@ -93,7 +95,18 @@ fix-client-drop-copy/
 ├── config.yaml
 ├── config.cfg
 ├── main.py
-└── requirements.txt
+└── tests/
+    ├── test_fix_application.py
+    ├── test_fix_client.py
+    ├── test_main.py
+```
+
+## Testing
+
+Unit tests are included. To run the tests, use the following command:
+
+```sh
+pytest
 ```
 
 ## Scripts
@@ -108,12 +121,11 @@ Defines the `FIXApplication` class, which handles FIX message events and logging
 
 ### `src/fix_client.py`
 
-Defines the `FIXClient` class, which manages the FIX session and sends messages.
+Defines the `FIXClient` class, which manages the FIX session, sends messages, and handles secondary hosts for disaster recovery.
 
 ### `src/menu.py`
 
 Handles the user interface and interactions using the Rich library.
-
 
 ## License
 
