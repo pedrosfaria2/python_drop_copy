@@ -11,6 +11,8 @@ class FIXClient:
         """
         Initialize settings, application, store factory, log factory, and initiator.
         """
+        self.config_file_path = config_file_path
+        self.fix_application = fix_application
         self.settings = None
         self.application = fix_application
         self.storeFactory = None
@@ -18,14 +20,19 @@ class FIXClient:
         self.initiator = None
         self.session_id = None
 
+        self._initialize_settings()
+
+    def _initialize_settings(self) -> None:
+        """
+        Initialize settings from the configuration file.
+        """
         try:
-            self.settings = fix.SessionSettings(config_file_path)
+            self.settings = fix.SessionSettings(self.config_file_path)
             self.storeFactory = fix.FileStoreFactory(self.settings)
             self.logFactory = fix.FileLogFactory(self.settings)
-            self.initiator = fix.SocketInitiator(self.application, self.storeFactory, self.settings, self.logFactory)
-            self.session_id = self._get_session_id_from_config(config_file_path)
+            self.session_id = self._get_session_id_from_config(self.config_file_path)
         except (fix.ConfigError, fix.RuntimeError) as e:
-            logging.error(f"Error initializing FIX client with config {config_file_path}: {e}")
+            logging.error(f"Error initializing FIX client with config {self.config_file_path}: {e}")
             raise
 
     def _get_session_id_from_config(self, config_file_path: str) -> fix.SessionID:
@@ -46,6 +53,79 @@ class FIXClient:
             raise
         except configparser.Error as e:
             logging.error(f"ConfigParser error reading {config_file_path}: {e}")
+            raise
+
+    def logon(self) -> None:
+        """
+        Start the connection and wait until logon is successful.
+        """
+        primary_host, secondary_host = self._get_hosts()
+        if self._try_logon(primary_host):
+            logging.info(f"Successfully logged on using primary host: {primary_host}")
+        elif secondary_host and self._try_logon(secondary_host):
+            logging.info(f"Successfully logged on using secondary host: {secondary_host}")
+        else:
+            logging.error("Failed to logon using both primary and secondary hosts.")
+            raise RuntimeError("Logon failed for both primary and secondary hosts.")
+
+    def _get_hosts(self) -> tuple:
+        """
+        Retrieve primary and secondary hosts from the configuration.
+        """
+        config = configparser.ConfigParser()
+        config.read(self.config_file_path)
+        primary_host = config['SESSION'].get('SocketConnectHostPrimary')
+        secondary_host = config['SESSION'].get('SocketConnectHostSecondary')
+        return primary_host, secondary_host
+
+    def _try_logon(self, host: str) -> bool:
+        """
+        Attempt to logon to the specified host.
+        """
+        try:
+            self._set_socket_connect_host(host)
+            self.initiator = fix.SocketInitiator(self.application, self.storeFactory, self.settings, self.logFactory)
+            self.initiator.start()
+            for _ in range(10):  # Try for a certain number of attempts
+                if self.initiator.isLoggedOn():
+                    return True
+                time.sleep(1)
+            self.initiator.stop()
+        except fix.RuntimeError as e:
+            logging.error(f"Failed to logon to host {host}: {e}")
+        return False
+
+    def _set_socket_connect_host(self, host: str) -> None:
+        """
+        Set the SocketConnectHost in the session settings.
+        """
+        try:
+            session_settings = self.settings.get(self.session_id)
+            session_settings.setString("SocketConnectHost", host)
+        except fix.ConfigError as e:
+            logging.error(f"Error setting SocketConnectHost to {host}: {e}")
+            raise
+
+    def logout(self) -> None:
+        """
+        Stop the connection.
+        """
+        try:
+            self.initiator.stop()
+        except fix.RuntimeError as e:
+            logging.error(f"Error during logout: {e}")
+            raise
+
+    def _send_message(self, msg: fix.Message) -> None:
+        """
+        Send the FIX message to the target.
+        """
+        try:
+            sender_comp_id = self._get_session_info('SenderCompID')
+            target_comp_id = self._get_session_info('TargetCompID')
+            fix.Session.sendToTarget(msg, sender_comp_id, target_comp_id)
+        except fix.RuntimeError as e:
+            logging.error(f"Error sending message: {e}")
             raise
 
     def _get_session_info(self, field_name: str) -> str:
@@ -80,39 +160,22 @@ class FIXClient:
             logging.error(f"Error creating header for message type {msg_type}: {e}")
             raise
 
-    def logon(self) -> None:
+    def send_resend_request(self, begin_seq_no: int, end_seq_no: int) -> None:
         """
-        Start the connection and wait until logon is successful.
-        """
-        try:
-            self.initiator.start()
-            while not self.initiator.isLoggedOn():
-                time.sleep(1)
-        except fix.RuntimeError as e:
-            logging.error(f"Error during logon: {e}")
-            raise
+        Send a ResendRequest message to request the resending of messages.
 
-    def logout(self) -> None:
-        """
-        Stop the connection.
+        :param begin_seq_no: Begin sequence number for the resend.
+        :param end_seq_no: End sequence number for the resend. Use 0 to request all subsequent messages.
         """
         try:
-            self.initiator.stop()
-        except fix.RuntimeError as e:
-            logging.error(f"Error during logout: {e}")
-            raise
+            resend_request = fix44.ResendRequest()
+            resend_request.setField(fix.BeginSeqNo(begin_seq_no))
+            resend_request.setField(fix.EndSeqNo(end_seq_no))
 
-    def _send_message(self, msg: fix.Message) -> None:
-        """
-        Send the FIX message to the target.
-        """
-        try:
-            sender_comp_id = self._get_session_info('SenderCompID')
-            target_comp_id = self._get_session_info('TargetCompID')
-            
-            fix.Session.sendToTarget(msg, sender_comp_id, target_comp_id)
-        except fix.RuntimeError as e:
-            logging.error(f"Error sending message: {e}")
+            self._send_message(resend_request)
+            logging.info(f"ResendRequest sent from {begin_seq_no} to {end_seq_no}")
+        except (fix.ConfigError, fix.RuntimeError) as e:
+            logging.error(f"Error sending ResendRequest from {begin_seq_no} to {end_seq_no}: {e}")
             raise
 
     def _add_party_ids(self, msg: fix.Message) -> None:
@@ -133,22 +196,4 @@ class FIXClient:
                 msg.addGroup(group)
         except (fix.ConfigError, fix.RuntimeError) as e:
             logging.error(f"Error adding party IDs: {e}")
-            raise
-
-    def send_resend_request(self, begin_seq_no: int, end_seq_no: int) -> None:
-        """
-        Send a ResendRequest message to request the resending of messages.
-
-        :param begin_seq_no: Begin sequence number for the resend.
-        :param end_seq_no: End sequence number for the resend. Use 0 to request all subsequent messages.
-        """
-        try:
-            resend_request = fix44.ResendRequest()
-            resend_request.setField(fix.BeginSeqNo(begin_seq_no))
-            resend_request.setField(fix.EndSeqNo(end_seq_no))
-
-            self._send_message(resend_request)
-            logging.info(f"ResendRequest sent from {begin_seq_no} to {end_seq_no}")
-        except (fix.ConfigError, fix.RuntimeError) as e:
-            logging.error(f"Error sending ResendRequest from {begin_seq_no} to {end_seq_no}: {e}")
             raise
