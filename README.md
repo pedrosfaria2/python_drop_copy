@@ -88,7 +88,8 @@ fix-client-drop-copy/
 │   ├── fix_application.py
 │   ├── fix_client.py
 │   ├── menu.py
-│   └── concat_logs.py
+│   ├── fix_field.py
+│   ├── fix_message.py
 ├── config.yaml
 ├── config.cfg
 ├── main.py
@@ -113,9 +114,6 @@ Defines the `FIXClient` class, which manages the FIX session and sends messages.
 
 Handles the user interface and interactions using the Rich library.
 
-### `src/concat_logs.py`
-
-Consolidates the log files into a single log file for easier analysis.
 
 ## License
 
